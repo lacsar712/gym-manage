@@ -1,0 +1,48 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-gym_manage}
+      MYSQL_USER: ${MYSQL_USER:-gym}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-gym123}
+      TZ: Asia/Shanghai
+    ports:
+      - '${MYSQL_PORT:-3307}:3306'
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - ./backend/scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-uroot', '-p${MYSQL_ROOT_PASSWORD:-root123}']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/gym_manage?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      DB_USERNAME: ${MYSQL_USER:-gym}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-gym123}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-please-change}
+      JWT_TTL_SECONDS: ${JWT_TTL_SECONDS:-86400}
+      TZ: Asia/Shanghai
+    ports:
+      - '${BACKEND_PORT:-8080}:8080'
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - '${FRONTEND_PORT:-3000}:80'
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
